@@ -116,6 +116,7 @@ def Eval(system_results, qrels):
         ireval["nDCG@20"] = np.array(nDCG_20)
         ireval.index = ireval.index + 1
         ireval.loc["mean"] = ireval.mean()
+
         # concat dataframe
         ir_eval = pd.concat([ir_eval,ireval], axis=0)
     # return ir_eval dataframe
