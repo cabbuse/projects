@@ -1,11 +1,15 @@
 import math
 import re
 from collections import Counter
+import sklearn.svm
 from gensim.models.ldamodel import LdaModel
 from gensim.corpora.dictionary import Dictionary
+from sklearn.model_selection import train_test_split
 from stemming.porter2 import stem
 import pandas as pd
 import numpy as np
+import scipy
+import random
 
 
 def Evaluation(system_results, qrels):
@@ -112,7 +116,7 @@ def dcg_k(k, qrels, subSysResults, i, QueriesRelDocs):
                 dcg += gain
             else:
                 dcg += gain / math.log2(discount)
-    aaa = 0
+
     return dcg
 
 
@@ -130,19 +134,30 @@ def idcg_k(k, i, qrels, subSysResults):
 
 
 def analysis(textData):
+    stopwords = [word.strip("\n") for word in open("stopwords.txt").readlines()]
     OT = textData.groupby(0).get_group("OT")
     NT = textData.groupby(0).get_group("NT")
     quran = textData.groupby(0).get_group("Quran")
-    OT = ' '.join(OT[1].tolist())
-    NT = ' '.join(NT[1].tolist())
-    quran = ' '.join(quran[1].tolist())
-    OT = re.sub(r"[^\w]+", " ", OT).lower().split(" ")
-    NT = re.sub(r"[^\w]+", " ", NT).lower().split(" ")
-    quran = re.sub(r"[^\w]+", " ", quran).lower().split(" ")
-    stopwords = [word.strip("\n") for word in open("stopwords.txt").readlines()]
+
+    qurancorpus = [lis.replace("Quran", "") for lis in list(quran[1])]
+    OTcorpus = [lis.replace("OT", "") for lis in list(OT[1])]
+    NTcorpus = [lis.replace("NT", "") for lis in list(NT[1])]
+    OT = re.sub(r"[^\w]+", " ", ' '.join(OTcorpus)).lower().split(" ")
+    NT = re.sub(r"[^\w]+", " ", ' '.join(NTcorpus)).lower().split(" ")
+    quran = re.sub(r"[^\w]+", " ", ' '.join(qurancorpus)).lower().split(" ")
+
+    qurancorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in qurancorpus]
+    OTcorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in OTcorpus]
+    NTcorpus =  [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in NTcorpus]
+    qurancorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in qurancorpus]
+    OTcorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in OTcorpus]
+    NTcorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in NTcorpus]
+
+
     OT = [stem(word.lower()) for word in OT if word.isalpha() and word not in stopwords]
     NT = [stem(word.lower()) for word in NT if word.isalpha() and word not in stopwords]
     quran = [stem(word.lower()) for word in quran if word.isalpha() and word not in stopwords]
+
     N_dict = dict(Counter(NT))
     O_dict = dict(Counter(OT))
     Q_dict = dict(Counter(quran))
@@ -162,22 +177,25 @@ def analysis(textData):
     print(Counter(QMI).most_common(10))
     print(Counter(QChi).most_common(10))
     print("\n")
-    LDA(NT, OT, quran)
+    LDA(NTcorpus, OTcorpus, qurancorpus)
 
     p = 0
 
     return
 
 
-def LDA(NT, OT, Q):
-    joinedC = list(NT + OT + Q)
-    dictionary = Dictionary([joinedC])
+def LDA(NTcorpus, OTcorpus, Qcorpus):
+    NTcorpus = [x[0] for x in NTcorpus]
+    OTcorpus = [x[0] for x in OTcorpus]
+    Qcorpus = [x[0] for x in Qcorpus]
+    joinedC = (NTcorpus + OTcorpus + Qcorpus)
+    dictionary = Dictionary(joinedC)
     dictionary.filter_extremes(no_below=50, no_above=0.1)
-    corpus = [dictionary.doc2bow(text) for text in [joinedC]]
+    corpus = [dictionary.doc2bow(text) for text in joinedC]
     lda = LdaModel(corpus, num_topics=20, id2word=dictionary, random_state=1)
-    topicD_Q = docTopProb(Q, lda)
-    topicD_NT = docTopProb(NT, lda)
-    topicD_OT = docTopProb(OT, lda)
+    topicD_Q = docTopProb(Qcorpus, lda)
+    topicD_NT = docTopProb(NTcorpus, lda)
+    topicD_OT = docTopProb(OTcorpus, lda)
     a = 0
     return
 
@@ -251,10 +269,74 @@ def MI_CHI(allDict, Cdict, NT, OT, Q, Cname):
 
     return mi_dic, chi_dic
 
+def to_BOW_M(processedData,IDdict):
+    matrix_size = (len(processedData), len(IDdict) + 1)
+    X = scipy.sparse.dok_matrix(matrix_size)
+    oov_index = len(IDdict)
+    for doc_id, doc in enumerate(processedData):
+        for word in doc:
+            # add count for the word
+            X[doc_id, IDdict.get(word,oov_index)] += 1
+    return X
+
+def pre_processTweets(data):
+    tweets = list(data["tweet"])
+    #tweetToken = [re.sub(r"[^\w]+", " ", x) for x in tweets]
+    tweetToken = [re.sub(r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''', " ", x.lower()) for x in tweets]
+    tweetToken = [re.findall("[A-Z\-\']{2,}(?![a-z])|[A-Z\-\'][a-z\-\']+(?=[A-Z])|[\'\w\-]+", x) for x in tweetToken]
+    allTweets = sum(tweetToken, [])
+    index = 0
+    allDict = {}
+    for term in allTweets:
+        if term not in allDict:
+            allDict[term] = index
+            index += 1
+    #sparseMatrix = to_BOW_M(tweetToken,allDict)
+
+    categories = list(data['sentiment'])
+    index = 0
+    categoryDict = {}
+    for term in categories:
+        if term not in categoryDict:
+            categoryDict[term] = index
+            index += 1
+    categoryVal = [categoryDict[x] for x in categories]
+    return allDict, categoryDict, categoryVal,tweetToken
+
+def Train_Dev_split(preprocessed_data, categories):
+    preprocessed_training_data = []
+    training_categories = []
+    preprocessed_dev_data = []
+    dev_categories = []
+    random.seed(1)
+    # generate random indexes for development set
+    dev_index = [random.randint(0, len(preprocessed_data)) for _ in range(len(preprocessed_data) // 10)]
+    # get verses of these index for development set
+    for i in dev_index:
+        preprocessed_dev_data.append(preprocessed_data[i])
+        dev_categories.append(categories[i])
+    # get verses of other indexes for train set
+    train_index = [i for i in range(len(preprocessed_data)) if i not in dev_index]
+    for i in train_index:
+        preprocessed_training_data.append(preprocessed_data[i])
+        training_categories.append(categories[i])
+    return preprocessed_training_data, training_categories, preprocessed_dev_data, dev_categories, dev_index
+
+
 
 system_results = pd.read_csv("system_results.csv", header=0, sep=",")
 qrels = pd.read_csv("qrels.csv", header=0, sep=",")
-# ir_eval = Evaluation(system_results, qrels)
+#ir_eval = Evaluation(system_results, qrels)
 
-textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
-analysis(textData)
+#textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
+#analysis(textData)
+
+sentimentData = pd.read_csv('sentiment.tsv', sep='\t', header=None)
+sentimentData = sentimentData.rename(columns=sentimentData.iloc[0]).drop(sentimentData.index[0])
+X_train, X_test = train_test_split(sentimentData, test_size=0.33, random_state=42)
+allDict, catDict, categoryVal, tweet_token = pre_processTweets(X_train)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, sentimentData['sentiment'], test_size=0.33, random_state=42)
+p = 0
+model = sklearn.svm.SVC(C=1000)
+model.fit(sparsematrix,categoryVal)
+a = 0
