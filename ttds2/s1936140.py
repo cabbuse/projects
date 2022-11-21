@@ -319,7 +319,7 @@ def computation_results(Prediction, Actual):
     Ppositive = []
     Pnegative = []
     Pneutral = []
-    for i in range(Actual):
+    for i in range(len(Actual)):
         if Actual[i] == "positive":
             Apositive.append(Actual[i])
             Ppositive.append(Prediction[i])
