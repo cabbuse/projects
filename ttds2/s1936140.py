@@ -152,11 +152,11 @@ def analysis(textData):
 
     qurancorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in qurancorpus]
     OTcorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in OTcorpus]
-    NTcorpus =  [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in NTcorpus]
-    qurancorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in qurancorpus]
+    NTcorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in NTcorpus]
+    qurancorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in
+                   qurancorpus]
     OTcorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in OTcorpus]
     NTcorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in NTcorpus]
-
 
     OT = [stem(word.lower()) for word in OT if word.isalpha() and word not in stopwords]
     NT = [stem(word.lower()) for word in NT if word.isalpha() and word not in stopwords]
@@ -204,7 +204,7 @@ def LDA(NTcorpus, OTcorpus, Qcorpus):
     return
 
 
-def docTopProb(corpus,lda):
+def docTopProb(corpus, lda):
     dictionary1 = Dictionary(corpus)
     dictionary1.filter_extremes(no_below=50, no_above=0.1)
     corpus1 = [dictionary1.doc2bow(text) for text in corpus]
@@ -273,20 +273,24 @@ def MI_CHI(allDict, Cdict, NT, OT, Q, Cname):
 
     return mi_dic, chi_dic
 
-def to_BOW_M(processedData,IDdict):
+
+def to_BOW_M(processedData, IDdict):
     matrix_size = (len(processedData), len(IDdict) + 1)
     X = scipy.sparse.dok_matrix(matrix_size)
     oov_index = len(IDdict)
     for doc_id, doc in enumerate(processedData):
         for word in doc:
             # add count for the word
-            X[doc_id, IDdict.get(word,oov_index)] += 1
+            X[doc_id, IDdict.get(word, oov_index)] += 1
     return X
+
 
 def pre_processTweets(data):
     tweets = list(data["tweet"])
-    #tweetToken = [re.sub(r"[^\w]+", " ", x) for x in tweets]
-    tweetToken = [re.sub(r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''', " ", x.lower()) for x in tweets]
+    # tweetToken = [re.sub(r"[^\w]+", " ", x) for x in tweets]
+    tweetToken = [re.sub(
+        r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''',
+        " ", x.lower()) for x in tweets]
     tweetToken = [re.findall("[A-Z\-\']{2,}(?![a-z])|[A-Z\-\'][a-z\-\']+(?=[A-Z])|[\'\w\-]+", x) for x in tweetToken]
     allTweets = sum(tweetToken, [])
     index = 0
@@ -295,7 +299,7 @@ def pre_processTweets(data):
         if term not in allDict:
             allDict[term] = index
             index += 1
-    #sparseMatrix = to_BOW_M(tweetToken,allDict)
+    # sparseMatrix = to_BOW_M(tweetToken,allDict)
 
     categories = list(data['sentiment'])
     index = 0
@@ -305,7 +309,42 @@ def pre_processTweets(data):
             categoryDict[term] = index
             index += 1
     categoryVal = [categoryDict[x] for x in categories]
-    return allDict, categoryDict, categoryVal,tweetToken
+    return allDict, categoryDict, categoryVal, tweetToken
+
+
+def computation_results(Prediction, Actual):
+    Apositive = []
+    Anegative = []
+    Aneutral = []
+    Ppositive = []
+    Pnegative = []
+    Pneutral = []
+    for i in range(Actual):
+        if Actual[i] == "positive":
+            Apositive.append(Actual[i])
+            Ppositive.append(Prediction[i])
+        elif Actual[i] == "neutral":
+            Aneutral.append(Actual[i])
+            Pneutral.append(Prediction[i])
+        elif Actual[i] == "negative":
+            Anegative.append(Actual[i])
+            Pneutral.append(Prediction[i])
+
+    p_pos = precision_score(Ppositive, Apositive)
+    r_pos = recall_score(Ppositive, Apositive)
+    f_pos = f1_score(Ppositive, Apositive)
+    p_neg = precision_score(Pnegative, Anegative)
+    r_neg = recall_score(Pnegative, Anegative)
+    f_neg = f1_score(Pnegative, Anegative)
+    p_neu = precision_score(Pneutral, Aneutral)
+    r_neu = recall_score(Pneutral, Aneutral)
+    f_neu = f1_score(Pneutral, Aneutral)
+    p_macro = precision_score(Prediction, Actual)
+    r_macro = recall_score(Prediction, Actual)
+    f_macro = f1_score(Prediction, Actual)
+    b = 0
+    return 0
+
 
 def Train_Dev_split(preprocessed_data, categories):
     preprocessed_training_data = []
@@ -326,60 +365,26 @@ def Train_Dev_split(preprocessed_data, categories):
         training_categories.append(categories[i])
     return preprocessed_training_data, training_categories, preprocessed_dev_data, dev_categories, dev_index
 
-    def compute_results(Prediction, Actual):
-        Apositive = []
-        Anegative = []
-        Aneutral  = []
-        Ppositive = []
-        Pnegative = []
-        Pneutral = []
-        for i in range(Actual):
-            if Actual[i] == "positive":
-                Apositive.append(Actual[i])
-                Ppositive.append(Prediction[i])
-            elif Actual[i] == "neutral":
-                Aneutral.append(Actual[i])
-                Pneutral.append(Prediction[i])
-            elif Actual[i] == "negative":
-                Anegative.append(Actual[i])
-                Pneutral.append(Prediction[i])
-
-        p_pos = precision_score(Ppositive,Apositive)
-        r_pos = recall_score(Ppositive,Apositive)
-        f_pos = f1_score(Ppositive,Apositive)
-        p_neg = precision_score(Pnegative,Anegative)
-        r_neg = recall_score(Pnegative,Anegative)
-        f_neg = f1_score(Pnegative,Anegative)
-        p_neu = precision_score(Pneutral,Aneutral)
-        r_neu = recall_score(Pneutral,Aneutral)
-        f_neu = f1_score(Pneutral,Aneutral)
-        p_macro = precision_score(Prediction,Actual)
-        r_macro = recall_score(Prediction,Actual)
-        f_macro = f1_score(Prediction,Actual)
-        b = 0
-
-
-
-
 
 system_results = pd.read_csv("system_results.csv", header=0, sep=",")
 qrels = pd.read_csv("qrels.csv", header=0, sep=",")
-#ir_eval = Evaluation(system_results, qrels)
+# ir_eval = Evaluation(system_results, qrels)
 
-#textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
-#analysis(textData)
+# textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
+# analysis(textData)
 
 sentimentData = pd.read_csv('sentiment.tsv', sep='\t', header=None)
 sentimentData = sentimentData.rename(columns=sentimentData.iloc[0]).drop(sentimentData.index[0])
 X_train, X_test = train_test_split(sentimentData, test_size=0.33, random_state=42)
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.33, random_state=42)
-sparsematrix = to_BOW_M(X_train,allDict)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.33,
+                                                    random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
 model = sklearn.svm.SVC(C=1000)
-model.fit(sparsematrix,y_train)
-trainDataPredict = model.predict(to_BOW_M(X_train,allDict))
-testDataPredict = model.predict(to_BOW_M(X_test,allDict))
-accuracyA = sum(1 for x,y in zip(trainDataPredict,y_train) if x == y) / len(trainDataPredict)
-accuracyB = sum(1 for x,y in zip(testDataPredict,y_test) if x == y) / len(testDataPredict)
-compute_results(testDataPredict,y_test)
+model.fit(sparsematrix, y_train)
+trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
+testDataPredict = model.predict(to_BOW_M(X_test, allDict))
+accuracyA = sum(1 for x, y in zip(trainDataPredict, y_train) if x == y) / len(trainDataPredict)
+accuracyB = sum(1 for x, y in zip(testDataPredict, y_test) if x == y) / len(testDataPredict)
+a = computation_results(testDataPredict, y_test)
 p = 0
