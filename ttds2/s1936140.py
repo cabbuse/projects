@@ -10,6 +10,10 @@ import pandas as pd
 import numpy as np
 import scipy
 import random
+import sklearn.metrics
+from sklearn.metrics import f1_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
 
 
 def Evaluation(system_results, qrels):
@@ -322,6 +326,40 @@ def Train_Dev_split(preprocessed_data, categories):
         training_categories.append(categories[i])
     return preprocessed_training_data, training_categories, preprocessed_dev_data, dev_categories, dev_index
 
+    def compute_results(Prediction, Actual):
+        Apositive = []
+        Anegative = []
+        Aneutral  = []
+        Ppositive = []
+        Pnegative = []
+        Pneutral = []
+        for i in range(Actual):
+            if Actual[i] == "positive":
+                Apositive.append(Actual[i])
+                Ppositive.append(Prediction[i])
+            elif Actual[i] == "neutral":
+                Aneutral.append(Actual[i])
+                Pneutral.append(Prediction[i])
+            elif Actual[i] == "negative":
+                Anegative.append(Actual[i])
+                Pneutral.append(Prediction[i])
+
+        p_pos = precision_score(Ppositive,Apositive)
+        r_pos = recall_score(Ppositive,Apositive)
+        f_pos = f1_score(Ppositive,Apositive)
+        p_neg = precision_score(Pnegative,Anegative)
+        r_neg = recall_score(Pnegative,Anegative)
+        f_neg = f1_score(Pnegative,Anegative)
+        p_neu = precision_score(Pneutral,Aneutral)
+        r_neu = recall_score(Pneutral,Aneutral)
+        f_neu = f1_score(Pneutral,Aneutral)
+        p_macro = precision_score(Prediction,Actual)
+        r_macro = recall_score(Prediction,Actual)
+        f_macro = f1_score(Prediction,Actual)
+        b = 0
+
+
+
 
 
 system_results = pd.read_csv("system_results.csv", header=0, sep=",")
@@ -334,9 +372,14 @@ qrels = pd.read_csv("qrels.csv", header=0, sep=",")
 sentimentData = pd.read_csv('sentiment.tsv', sep='\t', header=None)
 sentimentData = sentimentData.rename(columns=sentimentData.iloc[0]).drop(sentimentData.index[0])
 X_train, X_test = train_test_split(sentimentData, test_size=0.33, random_state=42)
-allDict, catDict, categoryVal, tweet_token = pre_processTweets(X_train)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, sentimentData['sentiment'], test_size=0.33, random_state=42)
-p = 0
+allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.33, random_state=42)
+sparsematrix = to_BOW_M(X_train,allDict)
 model = sklearn.svm.SVC(C=1000)
-model.fit(sparsematrix,categoryVal)
-a = 0
+model.fit(sparsematrix,y_train)
+trainDataPredict = model.predict(to_BOW_M(X_train,allDict))
+testDataPredict = model.predict(to_BOW_M(X_test,allDict))
+accuracyA = sum(1 for x,y in zip(trainDataPredict,y_train) if x == y) / len(trainDataPredict)
+accuracyB = sum(1 for x,y in zip(testDataPredict,y_test) if x == y) / len(testDataPredict)
+compute_results(testDataPredict,y_test)
+p = 0
