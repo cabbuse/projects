@@ -21,7 +21,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from scipy import stats
-
+import nltk
 
 
 def Evaluation(system_results, qrels):
@@ -73,9 +73,7 @@ def Evaluation(system_results, qrels):
         eval["nDCG@10"] = np.around(np.array(nDCG_10), 3)
         eval["nDCG@20"] = np.around(np.array(nDCG_20), 3)
         eval.index = eval.index + 1
-        eval.loc[str(len(eval.index) + 1)] = np.around(eval.mean(), 3)
-        eval._set_value(str(noQueries), "query_number", "mean")
-        # eval.loc["query_number"] = "mean"
+        eval.loc["mean"] = eval.mean()
         # concat dataframe
         ir_eval = pd.concat([ir_eval, eval], axis=0)
 
@@ -146,6 +144,7 @@ def idcg_k(k, i, qrels, subSysResults):
 
 
 def analysis(textData):
+    sno = nltk.stem.SnowballStemmer('english')
     stopwords = [word.strip("\n") for word in open("stopwords.txt").readlines()]
     OT = textData.groupby(0).get_group("OT")
     NT = textData.groupby(0).get_group("NT")
@@ -161,14 +160,14 @@ def analysis(textData):
     qurancorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in qurancorpus]
     OTcorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in OTcorpus]
     NTcorpus = [re.sub(r"[^\w]+", " ", x).lower().split(" ") for x in NTcorpus]
-    qurancorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in
+    qurancorpus = [[[sno.stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in
                    qurancorpus]
-    OTcorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in OTcorpus]
-    NTcorpus = [[[stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in NTcorpus]
+    OTcorpus = [[[sno.stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in OTcorpus]
+    NTcorpus = [[[sno.stem(word.lower()) for word in x if word.isalpha() and word not in stopwords]] for x in NTcorpus]
 
-    OT = [stem(word.lower()) for word in OT if word.isalpha() and word not in stopwords]
-    NT = [stem(word.lower()) for word in NT if word.isalpha() and word not in stopwords]
-    quran = [stem(word.lower()) for word in quran if word.isalpha() and word not in stopwords]
+    OT = [sno.stem(word.lower()) for word in OT if word.isalpha() and word not in stopwords]
+    NT = [sno.stem(word.lower()) for word in NT if word.isalpha() and word not in stopwords]
+    quran = [sno.stem(word.lower()) for word in quran if word.isalpha() and word not in stopwords]
 
     N_dict = dict(Counter(NT))
     O_dict = dict(Counter(OT))
@@ -363,10 +362,11 @@ def pre_processTweets3(data):
     #tweetToken = [re.sub(
     #    r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''',
     #    " ", x.lower()) for x in tweets]
-
+    sno = nltk.stem.SnowballStemmer('english')
     tt = TweetTokenizer()
     tweetToken = [tt.tokenize(x) for x in tweets]
-    tweetToken = [[stem(x) for x in y] for y in tweetToken]
+
+    tweetToken = [[sno.stem(x) for x in y] for y in tweetToken]
     allTweets = sum(tweetToken, [])
     index = 0
     allDict = {}
@@ -445,7 +445,16 @@ def Train_Dev_split(preprocessed_data, categories):
 ## ir_eval code
 system_results = pd.read_csv("system_results.csv", header=0, sep=",")
 qrels = pd.read_csv("qrels.csv", header=0, sep=",")
-# ir_eval = Evaluation(system_results, qrels)
+ir_eval = Evaluation(system_results, qrels)
+f1 = "ir_eval.csv"
+with open(f1, "a+") as file:
+    file.write("system_number,query_number,P@10,R@50,r-precision,AP,nDCG@10,nDCG@20" + "\n")
+for index, row in ir_eval.iterrows():
+    with open(f1, "a+") as file:
+        file.write(str(int(row["system_number"])) + "," + str(index) + "," + "{:.3f}".format(row["P@10"]) + \
+                    "," "{:.3f}".format(row["R@50"]) + "," + "{:.3f}".format(row["r-precision"]) + \
+                    "," "{:.3f}".format(row["AP"]) + "," + "{:.3f}".format(row["nDCG@10"]) + "," + \
+                    "{:.3f}".format(row["nDCG@20"]) + "\n")
 
 
 ##analysis code
