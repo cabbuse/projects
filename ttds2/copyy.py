@@ -471,7 +471,7 @@ if __name__ == "__main__":
                        "," "{:.3f}".format(row["AP"]) + "," + "{:.3f}".format(row["nDCG@10"]) + "," + \
                        "{:.3f}".format(row["nDCG@20"]) + "\n")
     #read stopwords collection
-    englishTS = open("englishST.txt")
+    englishTS = open("stopwords.txt")
     stopwords = englishTS.readlines()
     stopwords_list = []
     for word in stopwords:
