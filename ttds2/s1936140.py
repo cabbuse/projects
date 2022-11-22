@@ -14,6 +14,14 @@ import sklearn.metrics
 from sklearn.metrics import f1_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import precision_score
+from nltk.tokenize import TweetTokenizer
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from scipy import stats
+
 
 
 def Evaluation(system_results, qrels):
@@ -181,7 +189,20 @@ def analysis(textData):
     print(Counter(QMI).most_common(10))
     print(Counter(QChi).most_common(10))
     print("\n")
-    LDA(NTcorpus, OTcorpus, qurancorpus)
+    topicD_OT, topicD_NT, topicD_Q, lda = LDA(NTcorpus, OTcorpus, qurancorpus)
+
+    topic_ranked_NT = sorted(topicD_NT.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)[:1]
+    topic_ranked_OT = sorted(topicD_OT.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)[:1]
+    topic_ranked_Quran = sorted(topicD_Q.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)[:1]
+    for topic in topic_ranked_NT:
+        print("topic_id: " + str(topic[0]) + ", score: " + str(topic[1]))
+        print(lda.print_topic(topic[0]))
+    for topic in topic_ranked_OT:
+        print("topic_id: " + str(topic[0]) + ", score: " + str(topic[1]))
+        print(lda.print_topic(topic[0]))
+    for topic in topic_ranked_Quran:
+        print("topic_id: " + str(topic[0]) + ", score: " + str(topic[1]))
+        print(lda.print_topic(topic[0]))
 
     p = 0
 
@@ -194,14 +215,14 @@ def LDA(NTcorpus, OTcorpus, Qcorpus):
     Qcorpus = [x[0] for x in Qcorpus]
     joinedC = (NTcorpus + OTcorpus + Qcorpus)
     dictionary = Dictionary(joinedC)
-    dictionary.filter_extremes(no_below=50, no_above=0.1)
+    dictionary.filter_extremes(no_below=50, no_above=0.15)
     corpus = [dictionary.doc2bow(text) for text in joinedC]
     lda = LdaModel(corpus, num_topics=20, id2word=dictionary, random_state=1)
     topicD_Q = docTopProb(Qcorpus, lda)
     topicD_NT = docTopProb(NTcorpus, lda)
     topicD_OT = docTopProb(OTcorpus, lda)
     a = 0
-    return
+    return topicD_OT, topicD_NT, topicD_Q, lda
 
 
 def docTopProb(corpus, lda):
@@ -288,9 +309,10 @@ def to_BOW_M(processedData, IDdict):
 def pre_processTweets(data):
     tweets = list(data["tweet"])
     # tweetToken = [re.sub(r"[^\w]+", " ", x) for x in tweets]
-    tweetToken = [re.sub(
-        r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''',
-        " ", x.lower()) for x in tweets]
+    # tweetToken = [re.sub(
+    #     r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''',
+    #     " ", x.lower()) for x in tweets]
+    tweetToken = [re.sub(r"(https?:\/\/)?(www\.)?\w+\.\w+ ?", "", x.lower()) for x in tweets]
     tweetToken = [re.findall("[A-Z\-\']{2,}(?![a-z])|[A-Z\-\'][a-z\-\']+(?=[A-Z])|[\'\w\-]+", x) for x in tweetToken]
     allTweets = sum(tweetToken, [])
     index = 0
@@ -312,38 +334,93 @@ def pre_processTweets(data):
     return allDict, categoryDict, categoryVal, tweetToken
 
 
-def computation_results(Prediction, Actual):
+def pre_processTweets2(data,stopwords):
+    tweets = list(data["tweet"])
+    # tweetToken = [re.sub(r"[^\w]+", " ", x) for x in tweets]
+    tt = TweetTokenizer()
+    tweetToken = [tt.tokenize(x) for x in tweets]
+    allTweets = sum(tweetToken, [])
+    index = 0
+    allDict = {}
+    for term in allTweets:
+        if term not in allDict:
+            allDict[term] = index
+            index += 1
+    # sparseMatrix = to_BOW_M(tweetToken,allDict)
+
+    categories = list(data['sentiment'])
+    index = 0
+    categoryDict = {}
+    for term in categories:
+        if term not in categoryDict:
+            categoryDict[term] = index
+            index += 1
+    categoryVal = [categoryDict[x] for x in categories]
+    return allDict, categoryDict, categoryVal, tweetToken
+
+def pre_processTweets3(data):
+    tweets = list(data["tweet"])
+    #tweetToken = [re.sub(
+    #    r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''',
+    #    " ", x.lower()) for x in tweets]
+
+    tt = TweetTokenizer()
+    tweetToken = [tt.tokenize(x) for x in tweets]
+    tweetToken = [[stem(x) for x in y] for y in tweetToken]
+    allTweets = sum(tweetToken, [])
+    index = 0
+    allDict = {}
+    for term in allTweets:
+        if term not in allDict:
+            allDict[term] = index
+            index += 1
+    # sparseMatrix = to_BOW_M(tweetToken,allDict)
+
+    categories = list(data['sentiment'])
+    index = 0
+    categoryDict = {}
+    for term in categories:
+        if term not in categoryDict:
+            categoryDict[term] = index
+            index += 1
+    categoryVal = [categoryDict[x] for x in categories]
+    return allDict, categoryDict, categoryVal, tweetToken
+
+
+def computation_results(Prediction, Actual, catDict):
     Apositive = []
     Anegative = []
     Aneutral = []
     Ppositive = []
     Pnegative = []
     Pneutral = []
+    Prediction = [catDict[x] for x in Prediction]
+    Actual = [catDict[x] for x in Actual]
     for i in range(len(Actual)):
-        if Actual[i] == "positive":
+        if Actual[i] == 2:
             Apositive.append(Actual[i])
             Ppositive.append(Prediction[i])
-        elif Actual[i] == "neutral":
+        elif Actual[i] == 1:
             Aneutral.append(Actual[i])
             Pneutral.append(Prediction[i])
-        elif Actual[i] == "negative":
+        elif Actual[i] == 0:
             Anegative.append(Actual[i])
-            Pneutral.append(Prediction[i])
+            Pnegative.append(Prediction[i])
 
-    p_pos = precision_score(Ppositive, Apositive)
-    r_pos = recall_score(Ppositive, Apositive)
-    f_pos = f1_score(Ppositive, Apositive)
-    p_neg = precision_score(Pnegative, Anegative)
-    r_neg = recall_score(Pnegative, Anegative)
-    f_neg = f1_score(Pnegative, Anegative)
-    p_neu = precision_score(Pneutral, Aneutral)
-    r_neu = recall_score(Pneutral, Aneutral)
-    f_neu = f1_score(Pneutral, Aneutral)
-    p_macro = precision_score(Prediction, Actual)
-    r_macro = recall_score(Prediction, Actual)
-    f_macro = f1_score(Prediction, Actual)
-    b = 0
-    return 0
+    p_pos = precision_score(Ppositive, Apositive,average="micro")
+    r_pos = recall_score(Ppositive, Apositive,average="micro")
+    f_pos = f1_score(Ppositive, Apositive,average="micro")
+    p_neg = precision_score(Pnegative, Anegative,average="micro")
+    r_neg = recall_score(Pnegative, Anegative,average="micro")
+    f_neg = f1_score(Pnegative, Anegative,average="micro")
+    p_neu = precision_score(Pneutral, Aneutral,average="micro")
+    r_neu = recall_score(Pneutral, Aneutral,average="micro")
+    f_neu = f1_score(Pneutral, Aneutral,average="micro")
+    p_macro = precision_score(Prediction, Actual,average="micro")
+    r_macro = recall_score(Prediction, Actual,average="micro")
+    f_macro = f1_score(Prediction, Actual,average="micro")
+    format_array = [p_pos,r_pos,f_pos,p_neg,r_neg,f_neg,p_neu,r_neu,f_neu,p_macro,r_macro,f_macro]
+    return format_array
 
 
 def Train_Dev_split(preprocessed_data, categories):
@@ -365,26 +442,137 @@ def Train_Dev_split(preprocessed_data, categories):
         training_categories.append(categories[i])
     return preprocessed_training_data, training_categories, preprocessed_dev_data, dev_categories, dev_index
 
-
+## ir_eval code
 system_results = pd.read_csv("system_results.csv", header=0, sep=",")
 qrels = pd.read_csv("qrels.csv", header=0, sep=",")
 # ir_eval = Evaluation(system_results, qrels)
 
-# textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
-# analysis(textData)
 
+##analysis code
+textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
+analysis(textData)
+
+
+
+
+
+## text classification code
+stopwords = [word.strip("\n") for word in open("stopwords.txt").readlines()]
 sentimentData = pd.read_csv('sentiment.tsv', sep='\t', header=None)
 sentimentData = sentimentData.rename(columns=sentimentData.iloc[0]).drop(sentimentData.index[0])
-X_train, X_test = train_test_split(sentimentData, test_size=0.33, random_state=42)
+
+##baseline
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.33,
-                                                    random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
 sparsematrix = to_BOW_M(X_train, allDict)
 model = sklearn.svm.SVC(C=1000)
 model.fit(sparsematrix, y_train)
 trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = model.predict(to_BOW_M(X_test, allDict))
-accuracyA = sum(1 for x, y in zip(trainDataPredict, y_train) if x == y) / len(trainDataPredict)
-accuracyB = sum(1 for x, y in zip(testDataPredict, y_test) if x == y) / len(testDataPredict)
-a = computation_results(testDataPredict, y_test)
-p = 0
+a1 = computation_results(testDataPredict, y_test ,catDict)
+
+#
+# #c= 10
+allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
+model = sklearn.svm.SVC(C=10)
+model.fit(sparsematrix, y_train)
+trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+testDataPredict = model.predict(to_BOW_M(X_test, allDict))
+a2 = computation_results(testDataPredict, y_test ,catDict)
+
+#
+# #use nltk, stopword removal  + c=10
+allDict, catDict, categoryVal, tweet_token = pre_processTweets2(sentimentData,stopwords)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
+model = sklearn.svm.SVC(C=1000)
+model.fit(sparsematrix, y_train)
+trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+testDataPredict = model.predict(to_BOW_M(X_test, allDict))
+a3 = computation_results(testDataPredict, y_test ,catDict)
+
+
+#use stemming, nltk + c= 10
+allDict, catDict, categoryVal, tweet_token = pre_processTweets3(sentimentData)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
+model = sklearn.svm.SVC(C=1000)
+model.fit(sparsematrix, y_train)
+trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+testDataPredict = model.predict(to_BOW_M(X_test, allDict))
+a4 = computation_results(testDataPredict, y_test ,catDict)
+
+
+
+## use random forest
+allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
+classifier = RandomForestClassifier(n_estimators=50, random_state=0)
+classifier.fit(sparsematrix, y_train)
+trainDataPredict = classifier.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+testDataPredict = classifier.predict(to_BOW_M(X_test, allDict))
+a5 = computation_results(testDataPredict, y_test ,catDict)
+
+##logistic regression with onevsrest
+allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
+model = OneVsRestClassifier(LogisticRegression(random_state=0))
+model.fit(sparsematrix, y_train)
+trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+testDataPredict = model.predict(to_BOW_M(X_test, allDict))
+a6 = computation_results(testDataPredict, y_test ,catDict)
+
+
+## decision tree classifier
+allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
+classifier = DecisionTreeClassifier(random_state=0)
+classifier.fit(sparsematrix, y_train)
+trainDataPredict = classifier.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+testDataPredict = classifier.predict(to_BOW_M(X_test, allDict))
+a7 = computation_results(testDataPredict, y_test ,catDict)
+
+
+## k-nearest neighbours classifier
+allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
+X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+sparsematrix = to_BOW_M(X_train, allDict)
+classifier = KNeighborsClassifier(n_neighbors=5)
+classifier.fit(sparsematrix, y_train)
+trainDataPredict = classifier.predict(to_BOW_M(X_train, allDict))
+devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+testDataPredict = classifier.predict(to_BOW_M(X_test, allDict))
+a8 = computation_results(testDataPredict, y_test ,catDict)
+
+
+# print macro f1-score
+print(a1[11])
+print(a2[11])
+print(a3[11])
+print(a4[11])
+print(a5[11])
+print(a6[11])
+print(a7[11])
+print(a8[11])
+##
+

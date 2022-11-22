@@ -1,0 +1,5 @@
+
+             P@10 R@50 r-precision AP nDCG@10 nDCG@20
+bestsystem S3,S5,S6   S2   S3,S6   S3   S3   S3
+secondbestsystem S1   S1   S1      S6   S6   S6
+p-value     0.888     0.703 0.759  0.967 0.882 0.869
