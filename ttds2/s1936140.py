@@ -214,9 +214,9 @@ def LDA(NTcorpus, OTcorpus, Qcorpus):
     Qcorpus = [x[0] for x in Qcorpus]
     joinedC = (NTcorpus + OTcorpus + Qcorpus)
     dictionary = Dictionary(joinedC)
-    dictionary.filter_extremes(no_below=50, no_above=0.15)
+    dictionary.filter_extremes(no_below=60, no_above=0.05)
     corpus = [dictionary.doc2bow(text) for text in joinedC]
-    lda = LdaModel(corpus, num_topics=20, id2word=dictionary, random_state=1)
+    lda = LdaModel(corpus, num_topics=20, id2word=dictionary, random_state=0)
     topicD_Q = docTopProb(Qcorpus, lda)
     topicD_NT = docTopProb(NTcorpus, lda)
     topicD_OT = docTopProb(OTcorpus, lda)
@@ -443,23 +443,23 @@ def Train_Dev_split(preprocessed_data, categories):
     return preprocessed_training_data, training_categories, preprocessed_dev_data, dev_categories, dev_index
 
 ## ir_eval code
-system_results = pd.read_csv("system_results.csv", header=0, sep=",")
-qrels = pd.read_csv("qrels.csv", header=0, sep=",")
-ir_eval = Evaluation(system_results, qrels)
-f1 = "ir_eval.csv"
-with open(f1, "a+") as file:
-    file.write("system_number,query_number,P@10,R@50,r-precision,AP,nDCG@10,nDCG@20" + "\n")
-for index, row in ir_eval.iterrows():
-    with open(f1, "a+") as file:
-        file.write(str(int(row["system_number"])) + "," + str(index) + "," + "{:.3f}".format(row["P@10"]) + \
-                    "," "{:.3f}".format(row["R@50"]) + "," + "{:.3f}".format(row["r-precision"]) + \
-                    "," "{:.3f}".format(row["AP"]) + "," + "{:.3f}".format(row["nDCG@10"]) + "," + \
-                    "{:.3f}".format(row["nDCG@20"]) + "\n")
-
+# system_results = pd.read_csv("system_results.csv", header=0, sep=",")
+# qrels = pd.read_csv("qrels.csv", header=0, sep=",")
+# ir_eval = Evaluation(system_results, qrels)
+# f1 = "ir_eval.csv"
+# with open(f1, "a+") as file:
+#     file.write("system_number,query_number,P@10,R@50,r-precision,AP,nDCG@10,nDCG@20" + "\n")
+# for index, row in ir_eval.iterrows():
+#     with open(f1, "a+") as file:
+#         file.write(str(int(row["system_number"])) + "," + str(index) + "," + "{:.3f}".format(row["P@10"]) + \
+#                     "," "{:.3f}".format(row["R@50"]) + "," + "{:.3f}".format(row["r-precision"]) + \
+#                     "," "{:.3f}".format(row["AP"]) + "," + "{:.3f}".format(row["nDCG@10"]) + "," + \
+#                     "{:.3f}".format(row["nDCG@20"]) + "\n")
+#
 
 ##analysis code
-textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
-analysis(textData)
+# textData = pd.read_csv('train_and_dev.tsv', sep='\t', header=None)
+# analysis(textData)
 
 
 
@@ -472,116 +472,119 @@ sentimentData = sentimentData.rename(columns=sentimentData.iloc[0]).drop(sentime
 
 ##baseline
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+## need to change to train and dev when supplied with test data
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.01,random_state=42)
 sparsematrix = to_BOW_M(X_train, allDict)
 model = sklearn.svm.SVC(C=1000)
 model.fit(sparsematrix, y_train)
 trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = model.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = model.predict(to_BOW_M(X_test, allDict))
 a1 = computation_results(testDataPredict, y_test ,catDict)
-
+print(a1[11])
 #
 # #c= 10
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+## need to change to train and dev when supplied with test data
 sparsematrix = to_BOW_M(X_train, allDict)
 model = sklearn.svm.SVC(C=10)
 model.fit(sparsematrix, y_train)
 trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = model.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = model.predict(to_BOW_M(X_test, allDict))
 a2 = computation_results(testDataPredict, y_test ,catDict)
-
+print(a2[11])
 #
 # #use nltk, stopword removal  + c=10
 allDict, catDict, categoryVal, tweet_token = pre_processTweets2(sentimentData,stopwords)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+## need to change to train and dev when supplied with test data
 sparsematrix = to_BOW_M(X_train, allDict)
 model = sklearn.svm.SVC(C=1000)
 model.fit(sparsematrix, y_train)
 trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = model.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = model.predict(to_BOW_M(X_test, allDict))
 a3 = computation_results(testDataPredict, y_test ,catDict)
+print(a3[11])
 
 
 #use stemming, nltk + c= 10
 allDict, catDict, categoryVal, tweet_token = pre_processTweets3(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+## need to change to train and dev when supplied with test data
 sparsematrix = to_BOW_M(X_train, allDict)
 model = sklearn.svm.SVC(C=1000)
 model.fit(sparsematrix, y_train)
 trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = model.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = model.predict(to_BOW_M(X_test, allDict))
 a4 = computation_results(testDataPredict, y_test ,catDict)
-
+print(a4[11])
 
 
 ## use random forest
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+## need to change to train and dev when supplied with test data
 sparsematrix = to_BOW_M(X_train, allDict)
 classifier = RandomForestClassifier(n_estimators=50, random_state=0)
 classifier.fit(sparsematrix, y_train)
 trainDataPredict = classifier.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = classifier.predict(to_BOW_M(X_test, allDict))
 a5 = computation_results(testDataPredict, y_test ,catDict)
+print(a5[11])
 
 ##logistic regression with onevsrest
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+## need to change to train and dev when supplied with test data
 sparsematrix = to_BOW_M(X_train, allDict)
 model = OneVsRestClassifier(LogisticRegression(random_state=0))
 model.fit(sparsematrix, y_train)
 trainDataPredict = model.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = model.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = model.predict(to_BOW_M(X_test, allDict))
 a6 = computation_results(testDataPredict, y_test ,catDict)
-
+print(a6[11])
 
 ## decision tree classifier
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+## need to change to train and dev when supplied with test data
 sparsematrix = to_BOW_M(X_train, allDict)
 classifier = DecisionTreeClassifier(random_state=0)
 classifier.fit(sparsematrix, y_train)
 trainDataPredict = classifier.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = classifier.predict(to_BOW_M(X_test, allDict))
 a7 = computation_results(testDataPredict, y_test ,catDict)
-
+print(a7[11])
 
 ## k-nearest neighbours classifier
 allDict, catDict, categoryVal, tweet_token = pre_processTweets(sentimentData)
-X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.4,random_state=42)
-X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(tweet_token, (sentimentData['sentiment']).tolist(), test_size=0.1,random_state=42)
+#X_dev, X_test, y_dev, y_test = train_test_split(X_test, y_test, test_size=0.5,random_state=42)
+## need to change to train and dev when supplied with test data
 sparsematrix = to_BOW_M(X_train, allDict)
 classifier = KNeighborsClassifier(n_neighbors=5)
 classifier.fit(sparsematrix, y_train)
 trainDataPredict = classifier.predict(to_BOW_M(X_train, allDict))
-devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
+#devDataPredict = classifier.predict(to_BOW_M(X_dev, allDict))
 testDataPredict = classifier.predict(to_BOW_M(X_test, allDict))
 a8 = computation_results(testDataPredict, y_test ,catDict)
-
+print(a8[11])
 
 # print macro f1-score
-print(a1[11])
-print(a2[11])
-print(a3[11])
-print(a4[11])
-print(a5[11])
-print(a6[11])
-print(a7[11])
-print(a8[11])
+
 ##
 
